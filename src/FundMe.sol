@@ -2,6 +2,7 @@
 pragma solidity >=0.8.19 <0.9.0;
 
 import {PriceConverter} from "./libraries/PriceConverter.sol";
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 
 error FundMe__NotOwner();
 error FundMe__NotEnough();
@@ -13,13 +14,15 @@ contract FundMe {
     uint256 public constant MINIMUM_CONTRIBUTION = 5e18;
     mapping(address => uint256) funderAmounts;
     address[] public funders;
+    AggregatorV3Interface immutable private S_PRICE_FEED;
 
-    constructor() {
+    constructor(address priceFeedAddress) {
         I_OWNER = msg.sender;
+        S_PRICE_FEED = AggregatorV3Interface(priceFeedAddress);
     }
 
     function fund() public payable {
-        if (msg.value.convert() < MINIMUM_CONTRIBUTION) {
+        if (msg.value.convert(S_PRICE_FEED) < MINIMUM_CONTRIBUTION) {
             revert FundMe__NotEnough();
         }
         funderAmounts[msg.sender] += msg.value;
@@ -38,6 +41,11 @@ contract FundMe {
         if (callSuccess == false) {
             revert FundMe__NotSend();
         }
+    }
+
+    function getVersion() public view returns(uint256) {
+        AggregatorV3Interface priceFeed = AggregatorV3Interface(0x1b44F3514812d835EB1BDB0acB33d3fA3351Ee43);
+        return priceFeed.version();
     }
 
     modifier onlyOwner() {
